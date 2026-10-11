@@ -4,14 +4,18 @@
  * Includes fallback logic to ensure flawless user experience.
  */
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL 
+  || (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 export async function checkBackendStatus() {
   try {
-    const response = await fetch(`${API_BASE_URL}/`, { method: 'GET' });
-    if (!response.ok) throw new Error('Backend responded with error');
-    const data = await response.json();
-    return { online: true, data };
+    const healthUrl = `${API_BASE_URL}/api/health`;
+    const response = await fetch(healthUrl, { method: 'GET' });
+    if (!response.ok) {
+      const fallbackRes = await fetch(`${API_BASE_URL}/`);
+      if (!fallbackRes.ok) throw new Error('Backend responded with error');
+    }
+    return { online: true };
   } catch (error) {
     return { online: false, error: error.message };
   }

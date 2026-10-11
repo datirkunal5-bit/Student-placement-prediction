@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: student-placement-prediction
+    runtime: python
+    plan: free
+    buildCommand: "npm --prefix frontend install && npm --prefix frontend run build && pip install -r backend/requirements.txt"
+    startCommand: "gunicorn --chdir backend app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

@@ -3,15 +3,16 @@ import json
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
-
-app = Flask(__name__)
-# Enable CORS for all routes so React (localhost:5173) can communicate smoothly
-CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
+FRONTEND_DIST_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'frontend', 'dist'))
+
+app = Flask(__name__, static_folder=FRONTEND_DIST_DIR, static_url_path='')
+# Enable CORS for all routes so React (localhost:5173) can communicate smoothly
+CORS(app)
 
 # Global variables for model assets
 model = None
@@ -46,8 +47,25 @@ def load_ml_assets():
 # Attempt initial loading
 load_ml_assets()
 
-@app.route('/', methods=['GET'])
-def index():
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        "status": "online",
+        "message": "Student Placement Prediction API is operational",
+        "algorithm": "Support Vector Machine (SVM / SVC)"
+    }), 200
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path.startswith('api'):
+        return jsonify({"error": "API route not found"}), 404
+
+    if os.path.exists(os.path.join(FRONTEND_DIST_DIR, 'index.html')):
+        if path != "" and os.path.exists(os.path.join(FRONTEND_DIST_DIR, path)):
+            return send_from_directory(FRONTEND_DIST_DIR, path)
+        return send_from_directory(FRONTEND_DIST_DIR, 'index.html')
+
     return jsonify({
         "message": "Student Placement Prediction API is running",
         "algorithm": "Support Vector Machine (SVM / SVC)",
@@ -407,5 +425,6 @@ def predict():
         }), 500
 
 if __name__ == '__main__':
-    # Run Flask on port 5000 as required
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Listen on PORT environment variable if provided (Render, Railway, etc.), fallback to 5000
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

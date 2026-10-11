@@ -141,6 +141,23 @@ Open [http://localhost:5173](http://localhost:5173) in your browser to explore t
 
 ---
 
+## 🌐 Deploy to Render (Unified Single Service)
+
+The repository includes a ready-to-use [`render.yaml`](./render.yaml) blueprint and [`Procfile`](./Procfile) to deploy the frontend and backend together as a single free web service.
+
+### Quick Steps:
+1. Go to [render.com](https://render.com) and sign in with GitHub.
+2. Click **New +** > **Web Service**.
+3. Select your repository: `Student-placement-prediction`.
+4. Configure service settings (if not automatically loaded from `render.yaml`):
+   * **Runtime**: `Python 3`
+   * **Build Command**: `npm --prefix frontend install && npm --prefix frontend run build && pip install -r backend/requirements.txt`
+   * **Start Command**: `gunicorn --chdir backend app:app`
+   * **Plan**: `Free`
+5. Click **Deploy Web Service**! Once finished, your live app URL will be available immediately (e.g. `https://student-placement-prediction.onrender.com`).
+
+---
+
 ## 📝 Features Evaluated in Model
 
 1. **CGPA** (0.0 – 10.0): Overall academic degree average.
