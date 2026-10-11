@@ -2,6 +2,7 @@ import os
 import json
 import joblib
 import numpy as np
+import pandas as pd
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
@@ -69,6 +70,81 @@ def get_model_metrics():
         
     return jsonify(metrics), 200
 
+@app.route('/api/sample-profiles', methods=['GET'])
+def get_sample_profiles():
+    """Returns preset realistic student profiles for testing and quick demonstrations."""
+    samples = [
+        {
+            "id": "star",
+            "name": "High Achiever (Top Tier)",
+            "description": "Strong CGPA, multiple internships, high coding & communication scores",
+            "data": {
+                "cgpa": 8.9,
+                "tenth_percentage": 92.5,
+                "twelfth_percentage": 90.0,
+                "backlogs": 0,
+                "internships": 2,
+                "projects": 3,
+                "coding_score": 88.0,
+                "communication_score": 85.0,
+                "aptitude_score": 86.0,
+                "attendance": 92.0
+            }
+        },
+        {
+            "id": "tech",
+            "name": "Technical Whiz",
+            "description": "Exceptional coding & projects, moderate academics, zero backlogs",
+            "data": {
+                "cgpa": 7.4,
+                "tenth_percentage": 76.0,
+                "twelfth_percentage": 74.5,
+                "backlogs": 0,
+                "internships": 1,
+                "projects": 4,
+                "coding_score": 92.0,
+                "communication_score": 68.0,
+                "aptitude_score": 75.0,
+                "attendance": 84.0
+            }
+        },
+        {
+            "id": "borderline",
+            "name": "Borderline / Moderate",
+            "description": "Average CGPA, 1 backlog, good aptitude, needs coding improvement",
+            "data": {
+                "cgpa": 6.8,
+                "tenth_percentage": 70.0,
+                "twelfth_percentage": 68.0,
+                "backlogs": 1,
+                "internships": 1,
+                "projects": 2,
+                "coding_score": 58.0,
+                "communication_score": 62.0,
+                "aptitude_score": 66.0,
+                "attendance": 76.0
+            }
+        },
+        {
+            "id": "at_risk",
+            "name": "At-Risk Student",
+            "description": "Multiple backlogs, low technical and communication scores",
+            "data": {
+                "cgpa": 5.6,
+                "tenth_percentage": 62.0,
+                "twelfth_percentage": 58.0,
+                "backlogs": 3,
+                "internships": 0,
+                "projects": 1,
+                "coding_score": 42.0,
+                "communication_score": 48.0,
+                "aptitude_score": 49.0,
+                "attendance": 65.0
+            }
+        }
+    ]
+    return jsonify(samples), 200
+
 @app.route('/api/confusion-matrix-image', methods=['GET'])
 def get_confusion_matrix_image():
     """Serves the generated confusion matrix heatmap image."""
@@ -76,6 +152,66 @@ def get_confusion_matrix_image():
     if os.path.exists(img_path):
         return send_file(img_path, mimetype='image/png')
     return jsonify({"error": "Confusion matrix image not found."}), 404
+
+def generate_insights(data, is_placed, prob_placed):
+    """Generates strengths, areas for improvement, and actionable tips based on student data."""
+    strengths = []
+    improvements = []
+    actions = []
+
+    # Academic Performance
+    if data['cgpa'] >= 8.0:
+        strengths.append(f"Strong CGPA ({data['cgpa']}/10) passes premium recruiter filters.")
+    elif data['cgpa'] < 6.5:
+        improvements.append(f"CGPA is currently {data['cgpa']}. Aim to raise it above 7.0 for wider eligibility.")
+        actions.append("Focus on core semester coursework to elevate cumulative CGPA.")
+
+    # Backlogs
+    if data['backlogs'] == 0:
+        strengths.append("Clean academic record with 0 active backlogs.")
+    else:
+        improvements.append(f"{data['backlogs']} active backlog(s) strictly disqualify or penalize in major campus drives.")
+        actions.append("Clear all standing backlogs in the upcoming supplementary examination round.")
+
+    # Coding & Projects
+    if data['coding_score'] >= 75:
+        strengths.append(f"Competitive coding score ({data['coding_score']}/100) indicates solid technical problem-solving.")
+    else:
+        improvements.append(f"Technical coding score ({data['coding_score']}/100) is below target threshold for product/service roles.")
+        actions.append("Practice Data Structures & Algorithms daily on LeetCode/HackerRank to cross 75+.")
+
+    if data['projects'] >= 3:
+        strengths.append(f"Robust project portfolio with {data['projects']} implemented projects.")
+    elif data['projects'] < 2:
+        improvements.append("Limited project count. Employers prioritize demonstrable practical work.")
+        actions.append("Build and deploy 1-2 full-stack or domain-specific projects to GitHub.")
+
+    # Internships
+    if data['internships'] >= 1:
+        strengths.append(f"Industry exposure proven with {data['internships']} completed internship(s).")
+    else:
+        improvements.append("Zero industry internships completed.")
+        actions.append("Apply for summer or virtual internships to gain verified practical experience.")
+
+    # Soft skills & Aptitude
+    if data['communication_score'] < 65:
+        improvements.append("Communication score requires attention for HR and interview clearance.")
+        actions.append("Engage in mock technical and HR interviews, debate clubs, or presentation sessions.")
+
+    if data['aptitude_score'] < 65:
+        improvements.append("Aptitude score is under standard placement screening cutoff (typically 65%+).")
+        actions.append("Solve quantitative aptitude and logical reasoning mock tests weekly.")
+
+    # Attendance
+    if data['attendance'] < 75:
+        improvements.append(f"Attendance is {data['attendance']}%, which may fail college placement criteria.")
+        actions.append("Ensure classroom attendance stays strictly above 75%.")
+
+    return {
+        "strengths": strengths if strengths else ["Basic academic requirements met."],
+        "improvements": improvements if improvements else ["Consistent across all evaluated metrics."],
+        "actions": actions if actions else ["Maintain ongoing interview preparation and project maintenance."]
+    }
 
 def validate_input_data(data):
     """
@@ -231,36 +367,38 @@ def predict():
         return jsonify({"error": error_msg}), 400
         
     try:
-        # Construct feature vector in the EXACT order saved during training
-        feature_vector = [cleaned_data[col] for col in features]
-        feature_array = np.array([feature_vector])
+        # Construct feature vector in DataFrame format matching training columns
+        feature_df = pd.DataFrame([[cleaned_data[col] for col in features]], columns=features)
         
         # Scale features using the fitted training StandardScaler
-        scaled_features = scaler.transform(feature_array)
+        scaled_features = scaler.transform(feature_df)
         
         # Predict class and probability using the trained SVM (SVC)
         prediction_class = int(model.predict(scaled_features)[0])
         probabilities = model.predict_proba(scaled_features)[0]
         
         # probability of class 1 (Placed) vs class 0 (Not Placed)
-        prob_placed = probabilities[1]
-        prob_not_placed = probabilities[0]
+        prob_placed = float(probabilities[1])
+        prob_not_placed = float(probabilities[0])
         
         if prediction_class == 1:
             status = "Likely Placed"
-            confidence = round(float(prob_placed) * 100, 1)
+            confidence = round(prob_placed * 100, 1)
         else:
             status = "Not Likely Placed"
-            confidence = round(float(prob_not_placed) * 100, 1)
+            confidence = round(prob_not_placed * 100, 1)
+            
+        insights = generate_insights(cleaned_data, prediction_class, prob_placed)
             
         return jsonify({
             "prediction": prediction_class,
             "status": status,
             "confidence": confidence,
             "probabilities": {
-                "placed": round(float(prob_placed) * 100, 2),
-                "not_placed": round(float(prob_not_placed) * 100, 2)
-            }
+                "placed": round(prob_placed * 100, 2),
+                "not_placed": round(prob_not_placed * 100, 2)
+            },
+            "insights": insights
         }), 200
         
     except Exception as e:
